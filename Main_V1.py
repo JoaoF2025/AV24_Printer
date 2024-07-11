@@ -33,6 +33,13 @@ print("G90 Sent")
 gcode2 = f"G28 \n"
 printer_ser.write(gcode2.encode())
 print("G28 Sent")
+x = 0
+y = 0
+z = 0
+
+x_old = x
+y_old = y
+z_old = z
 
 #Definir feedrate
 gcode3 = f"G01 X0 F1000 \n"
@@ -49,13 +56,6 @@ def send_gcode(command, printer):
     return response
 
 if user_input == '':
-    x = 0
-    y = 0
-    z = 0
-
-    x_old = x
-    y_old = y
-    z_old = z
 
     # Traduzir a info recebida do arduino
     def decoder(arduino_data):
@@ -107,17 +107,35 @@ if user_input == '':
     finally:
         printer_ser.close()
 
+
 elif user_input == ' ':
     
+    #Desenho interessante
+    R = 5
+    C = 30
+    Esq_inicio = y - R
+    Dir_inicio = x + 2*R
+    Topo_inicio_y = y + R
+    Topo_linha_1 = y + C
+    cabeça_x = x + 2*R
+
     send_gcode(f"G01 Z2 F5000\n", printer_ser)
-    send_gcode(f"G01 X10 Y10 Z0\n", printer_ser)
-    send_gcode(f"G02 X10 Y10 I0 J5\n", printer_ser)
+    send_gcode(f"G01 X{x} Y{Esq_inicio} \n", printer_ser)
+    send_gcode(f"G01 Z0 \n", printer_ser)
+    send_gcode(f"G02 X{x} Y{Esq_inicio} I0 J5\n", printer_ser)
     send_gcode(f"G01 Z2\n", printer_ser)
-    send_gcode(f"G01 X20 Y10 Z0\n", printer_ser)
-    send_gcode(f"G02 X20 Y10 I0 J5\n", printer_ser)
-    send_gcode(f"G01 Z5\n", printer_ser)
-    send_gcode(f"G01 X10 Y20 Z0\n", printer_ser)
-    send_gcode(f"G01 Y40 \n", printer_ser)
-    send_gcode(f"G02 X20 Y40 I5 J0\n", printer_ser)
-    send_gcode(f"G01 Y20 \n", printer_ser)
+    send_gcode(f"G01 X{Dir_inicio} Y{Esq_inicio}\n", printer_ser)
+    send_gcode(f"G01 Z0 \n", printer_ser)
+    send_gcode(f"G02 X{Dir_inicio} Y{Esq_inicio} I0 J5\n", printer_ser)
+    send_gcode(f"G01 Z2\n", printer_ser)
+    send_gcode(f"G01 X{x} Y{Topo_inicio_y} \n", printer_ser)
+    send_gcode(f"G01 Z0 \n", printer_ser)
+    send_gcode(f"G01 Y{Topo_linha_1} \n", printer_ser)
+    send_gcode(f"G02 X{cabeça_x} Y{Topo_inicio_y} I5 J0\n", printer_ser)
+    send_gcode(f"G01 Y{Topo_inicio_y} \n", printer_ser)
+    send_gcode(f"G01 Z2\n", printer_ser)
+    send_gcode(f"G01 X{x} Y{y} \n", printer_ser)
+    send_gcode(f"G01 Z{z} \n", printer_ser)
+
+    
     
