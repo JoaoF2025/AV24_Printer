@@ -21,7 +21,7 @@ char command;
 
 int print_max_x = 200;
 int print_max_y = 200;
-int print_max_z = 150;
+int print_max_z = 100;
 
 String Output;
 
@@ -37,7 +37,7 @@ void loop() {
 
   if (Serial.available() > 0) {
     command = Serial.read();
-    if (command == 'T') {
+   // if (command == 'T') {
       x_val = map(analogRead(A0), 0, 1023, 0, print_max_x);
       y_val = map(analogRead(A1), 0, 1023, 0, print_max_y);
       z_val = map(analogRead(A2), 0, 1023, 0, print_max_z);
@@ -46,6 +46,6 @@ void loop() {
       Output = String(x_val) + "," + String(y_val) + "," + String(z_val);
       Serial.println(Output);
     
-    }
+ //   }
   }
 }
