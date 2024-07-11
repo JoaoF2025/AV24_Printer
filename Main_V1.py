@@ -111,8 +111,8 @@ if user_input == '':
 elif user_input == ' ':
     
     #Desenho interessante
-    R = 5
-    C = 30
+    R = 10
+    C = 35
     Esq_inicio = y - R
     Dir_inicio = x + 2*R
     Topo_inicio_y = y + R
@@ -137,5 +137,4 @@ elif user_input == ' ':
     send_gcode(f"G01 X{x} Y{y} \n", printer_ser)
     send_gcode(f"G01 Z{z} \n", printer_ser)
 
-    
     
