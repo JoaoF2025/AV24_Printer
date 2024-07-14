@@ -1,102 +1,188 @@
-import serial
-import numpy as np
-import time
 import tkinter as tk
 from tkinter import Canvas
+import serial
+import time
 
-#Printer and Arduino variables
-
+# Replace 'COM3' with the appropriate COM port for Arduino and 'COM4' for 3D printer
 arduino_port = 'COM12'
 printer_port = 'COM10'
 baud_rate = 115200
 
-# Main application class
-class DrawingApp(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        
-        # Set the title and size of the main window
-        self.title("Drawing App")
-        self.geometry("800x600")
-        
-        # Create and pack the left frame for buttons
-        self.left_frame = tk.Frame(self)
-        self.left_frame.pack(side=tk.LEFT, fill=tk.Y)
-        
-        # Create and pack the plotter frame for the canvas
-        self.plotter_frame = tk.Frame(self, bd=2, relief=tk.SOLID)  # Added border
-        self.plotter_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=20)
-        
-        # Create and pack the bottom frame for coordinate display
-        self.coord_frame = tk.Frame(self)
-        self.coord_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        # Add buttons to the left frame
-        self.home_button = tk.Button(self.left_frame, text="Home", command=self.home)
-        self.home_button.pack(padx=20, pady=20)
-        
-        self.free_drawing_button = tk.Button(self.left_frame, text="Free Drawing", command=self.free_drawing)
-        self.free_drawing_button.pack(padx=20, pady=20)
-        
-        self.game_mode_button = tk.Button(self.left_frame, text="Game Mode", command=self.game_mode)
-        self.game_mode_button.pack(padx=20, pady=20)
-        
-        # Create and pack the canvas (whiteboard) in the plotter frame
-        self.canvas = Canvas(self.plotter_frame, bg="white")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-        
-        # Bind mouse motion events to canvas for drawing and coordinate display
-        self.canvas.bind("<B1-Motion>", self.draw)
-        self.canvas.bind("<Motion>", self.show_coordinates)
-        
-        # Create and pack the coordinate display label in the bottom frame
-        self.coord_label = tk.Label(self.coord_frame, text="XYZ Coordinates: (X: 0, Y: 0)")
-        self.coord_label.pack(pady=5)
-        
-    # Placeholder method for Home button functionality
-    def home(self):
-        pass
+# Establish serial connection to Arduino
+try:
+    arduino_ser = serial.Serial(arduino_port, baud_rate, timeout=2)
+    print("Arduino OK")
+except serial.SerialException as e:
+    print(f"Failed to connect to Arduino: {e}")
+    arduino_ser = None
+
+# Global variables to store previous coordinates
+prev_x, prev_y = None, None
+pointer = None
+
+# Constants for canvas size and scaling factor
+CANVAS_MARGIN = 20
+MAX_COORD = 200
+canvas_width, canvas_height = MAX_COORD + CANVAS_MARGIN * 2, MAX_COORD + CANVAS_MARGIN * 2
+scaling_factor = 1.0
+
+# Function to initialize the main window
+def init_window():
+    global root, canvas, coord_label_x, coord_label_y, coord_label_z, scaling_factor
+
+    root = tk.Tk()
+    root.title("Drawing App")
     
-    # Placeholder method for Free Drawing button functionality
-    def free_drawing(self):
-        pass
+    # Maximize window
+    root.state('zoomed')  # For Windows
+    # For other platforms, use: root.attributes('-fullscreen', True)
     
-    # Placeholder method for Game Mode button functionality
-    def game_mode(self):
-        pass
+    # Create and pack the left frame for buttons
+    left_frame = tk.Frame(root, width=200)
+    left_frame.pack(side=tk.LEFT, fill=tk.Y)
     
-    # Method to draw on the canvas
-    def draw(self, event):
-        # Get the current mouse coordinates, adjusting for bottom-left origin
-        x, y = event.x, self.canvas.winfo_height() - event.y
-        # Draw a small oval (circle) at the mouse coordinates
-        self.canvas.create_oval(event.x-2, event.y-2, event.x+2, event.y+2, fill="black")
-        
-    # Method to display mouse coordinates on the label
-    def show_coordinates(self, event):
-        # Get the current mouse coordinates, adjusting for bottom-left origin
-        x, y = event.x, self.canvas.winfo_height() - event.y
-        # Update the coordinate label with the current coordinates
-        self.coord_label.config(text=f"XYZ Coordinates: (X: {x}, Y: {y})")
-        
+    # Create and pack the plotter frame for the canvas
+    plotter_frame = tk.Frame(root, bd=2, relief=tk.SOLID)  # Added border
+    plotter_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=20)
+    
+    # Create and pack the right frame for coordinate display
+    coord_frame = tk.Frame(root, width=200)
+    coord_frame.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    # Add buttons to the left frame
+    button_font = ("Arial", 18)
+    home_button = tk.Button(left_frame, text="Home", command=home, font=button_font)
+    home_button.pack(padx=20, pady=20)
+    
+    game_mode_button = tk.Button(left_frame, text="Game Mode", command=game_mode, font=button_font)
+    game_mode_button.pack(padx=20, pady=20)
 
-# Function to send a G-code command and receive the response
-def send_gcode(command, printer):
-    printer.write(command.encode())
-    time.sleep(0.5)  # Give the printer some time to process the command
-    response = printer.readline().decode().strip()
-    return response
+    close_button = tk.Button(left_frame, text="Close", command=close_program, font=button_font)
+    close_button.pack(padx=20, pady=20)
+    
+    # Create and pack the canvas (whiteboard) in the plotter frame
+    canvas = Canvas(plotter_frame, bg="white")
+    canvas.pack(fill=tk.BOTH, expand=True)
+    canvas.bind("<Configure>", resize_canvas)
+    
+    # Create and pack the coordinate display labels in the right frame
+    coord_label_font = ("Arial", 18)
+    coord_label_x = tk.Label(coord_frame, text="X:", font=coord_label_font, anchor="w")
+    coord_label_x.pack(pady=5, padx=20, anchor="w")
 
+    coord_label_y = tk.Label(coord_frame, text="Y:", font=coord_label_font, anchor="w")
+    coord_label_y.pack(pady=5, padx=20, anchor="w")
 
+    coord_label_z = tk.Label(coord_frame, text="Z:", font=coord_label_font, anchor="w")
+    coord_label_z.pack(pady=5, padx=20, anchor="w")
 
-def main():
+    # Update scaling factor based on the initial canvas size
+    canvas.update_idletasks()  # Ensure canvas is updated to its final size
+    resize_canvas(None)
+
+# Function for Home button functionality
+def home():
+    global canvas
+    # Change the background color of the canvas
+    canvas.config(bg="lightblue")
+
+# Placeholder function for Game Mode button functionality
+def game_mode():
     pass
-    
-    
 
-if __name__ == '__main__':
-    main()
-        # Create an instance of the DrawingApp class
-    app = DrawingApp()
+# Function to close the program
+def close_program():
+    global root
+    root.destroy()
+
+# Function to decode Arduino data
+def decoder(arduino_data):
+    # Split the data by commas
+    parts = arduino_data.split(',')
+    
+    # Assign coordinates
+    x = int(parts[0].strip())
+    y = int(parts[1].strip())
+    z = int(parts[2].strip())
+    
+    return x, y, z
+
+# Function to handle canvas resizing
+def resize_canvas(event):
+    global canvas_width, canvas_height, scaling_factor, canvas
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
+    scaling_factor = min(canvas_width, canvas_height) / (MAX_COORD + CANVAS_MARGIN * 2)
+    print(f"Canvas resized: width={canvas_width}, height={canvas_height}, scaling_factor={scaling_factor}")
+
+# Function to draw on the canvas using decoded coordinates
+def draw(x, y):
+    global canvas, prev_x, prev_y, scaling_factor, pointer
+    # Adjust coordinates for canvas size and scaling
+    adjusted_x = x * scaling_factor + CANVAS_MARGIN
+    adjusted_y = (MAX_COORD - y) * scaling_factor + CANVAS_MARGIN  # Inverting y-axis for bottom-left origin
+    # Draw a line from the previous coordinates to the current coordinates
+    if prev_x is not None and prev_y is not None:
+        canvas.create_line(prev_x, prev_y, adjusted_x, adjusted_y, fill="black")
+    # Update previous coordinates
+    prev_x, prev_y = adjusted_x, adjusted_y
+    # Update pointer position
+    if pointer:
+        canvas.delete(pointer)
+    pointer = canvas.create_oval(adjusted_x - 2, adjusted_y - 2, adjusted_x + 2, adjusted_y + 2, outline="red", fill="red")
+    # Update coordinates display
+    show_coordinates(x, y)
+
+# Function to display coordinates on the label
+def show_coordinates(x, y):
+    global coord_label_x, coord_label_y, coord_label_z
+    # Update the coordinate labels with the current coordinates
+    coord_label_x.config(text=f"X: {x}")
+    coord_label_y.config(text=f"Y: {y}")
+    coord_label_z.config(text=f"Z: 0")  # Assuming Z is always 0 in this example
+
+# Function to read from Arduino and update the GUI
+def update_data():
+    global arduino_ser
+
+    if arduino_ser is not None and arduino_ser.is_open:
+        try:
+            # Ask for information
+            arduino_ser.write(b'T')
+            print("Requesting data from Arduino...")
+
+            # Read a line of data from the Arduino
+            arduino_data = arduino_ser.readline().decode('utf-8').strip()
+            
+            if arduino_data:
+                print(f'Received from Arduino: {arduino_data}')
+                    
+                try:
+                    x, y, z = decoder(arduino_data)
+                    draw(x, y)
+                    print(f"Parsed coordinates: X={x}, Y={y}, Z={z}")
+                        
+                except ValueError as e:
+                    print(f"Error parsing coordinates: {e}")
+                    
+            else:
+                print("No data received from Arduino.")
+                        
+        except serial.SerialException as e:
+            print(f'Serial error: {e}')
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+    
+    # Schedule the next call to this function
+    root.after(300, update_data)  # Adjust the delay as needed
+
+# Main entry point for the application
+if __name__ == "__main__":
+    # Initialize the main window and components
+    init_window()
+    
+    # Start the periodic data update
+    root.after(1000, update_data)
+    
     # Run the application main loop
-    app.mainloop()
+    root.mainloop()
