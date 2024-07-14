@@ -8,7 +8,7 @@ import time
 
 # Replace 'COM3' with the appropriate COM port for Arduino and 'COM4' for 3D printer
 arduino_port = 'COM12'
-printer_port = 'COM10'
+printer_port = 'COM11'
 baud_rate = 115200
 
 # Establish serial connection to Arduino

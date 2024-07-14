@@ -55,7 +55,7 @@ if user_input == '':
                     except ValueError as e:
                         print(f"Error parsing coordinates: {e}")
                         
-                time.sleep(0.1)  # Adjust the delay as needed
+                time.sleep(0.3)  # Adjust the delay as needed
 
 
         except serial.SerialException as e:
